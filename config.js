@@ -13,4 +13,4 @@ window.ADMIN_EMAILS = ['belarminokaique581@gmail.com'];
 
 // Seu WhatsApp com DDI e DDD, só números (ex.: '5511999999999').
 // Aparece como botão na tela "Aguardando liberação". Deixe vazio para esconder.
-window.WHATSAPP = '';
+window.WHATSAPP = '5524992060655';
