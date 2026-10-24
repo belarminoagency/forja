@@ -1,12 +1,11 @@
-// Cole aqui o firebaseConfig do projeto "forja" no Firebase (veja LEIA-ME.md).
-// Enquanto apiKey for "COLE_AQUI", o app abre em modo demonstração.
+// Projeto "forja" no Firebase (veja LEIA-ME.md)
 window.FIREBASE_CONFIG = {
-  apiKey: "COLE_AQUI",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBpl5GkIkQOtriiTyI0N5bsevM0E71hqq4",
+  authDomain: "forja-f7ca8.firebaseapp.com",
+  projectId: "forja-f7ca8",
+  storageBucket: "forja-f7ca8.firebasestorage.app",
+  messagingSenderId: "1011302668862",
+  appId: "1:1011302668862:web:66c33e3c5f1579581e8f6f"
 };
 
 // Quem pode liberar e tirar acesso dos clientes (também precisa estar em firestore.rules)
