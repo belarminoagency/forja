@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Quem libera o acesso. Mesmo e-mail de ADMIN_EMAILS no config.js.
+    function admin() {
+      return request.auth != null && request.auth.token.email in [
+        'belarminokaique581@gmail.com'
+      ];
+    }
+    function dono(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Um documento por cliente: nome, WhatsApp, e-mail e se o acesso está liberado.
+    // O cliente cria o próprio pedido (sempre bloqueado) e não consegue se liberar sozinho.
+    match /users/{uid} {
+      allow read: if admin() || dono(uid);
+      allow create: if admin() || (dono(uid)
+        && request.resource.data.aprovado == false
+        && request.resource.data.recusado == false);
+      allow update: if admin() || (dono(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['aprovado', 'recusado', 'email']));
+      allow delete: if admin();
+    }
+  }
+}

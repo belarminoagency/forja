@@ -103,7 +103,7 @@ fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:14px
 legend{padding:0;margin-bottom:4px}
 .field{display:flex;flex-direction:column;gap:6px}
 .field>span{font-weight:700;font-size:.92rem}
-.field input[type=text],.field input[type=number]{font:600 1.05rem var(--body);padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:100%}
+.field input[type=text],.field input[type=number],.field input[type=email],.field input[type=password],.field input[type=tel]{font:600 1.05rem var(--body);padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:100%}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .opts.one{grid-template-columns:1fr}
@@ -138,12 +138,27 @@ nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:
 nav button{background:none;border:0;padding:8px 0;font:700 .78rem var(--body);color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 nav button[aria-current="true"]{color:var(--ember)}
+/* acesso */
+.seg button[aria-selected="true"]{border:2px solid var(--ember);background:var(--glow);padding:8px 5px}
+.link{background:none;border:0;padding:4px 0;font:700 .92rem var(--body);color:var(--ember);cursor:pointer;align-self:center}
+a.btn{display:block;text-align:center;text-decoration:none}
+.member .acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.member .tip a{color:inherit}
+.mini{font:700 .82rem var(--body);padding:8px 12px;border-radius:10px;border:0;background:var(--ember);color:var(--ember-ink);cursor:pointer;white-space:nowrap}
+.mini.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+details summary{cursor:pointer;font-weight:700;padding:6px 0}
+details .plain{margin-top:6px}
+nav button{position:relative}
+.badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--ember);color:var(--ember-ink);font:700 .7rem/18px var(--body);font-style:normal}
 @media (max-width:370px){.facts{grid-template-columns:1fr 1fr}.days{gap:4px}.days .opt span{font-size:.75rem}}
 @media (prefers-reduced-motion:reduce){.progress i{transition:none}}
 </style>
 
 </head>
 <body>
+<!-- ACESSO (login, aguardando liberação) -->
+<div class="wrap" id="gate"></div>
+
 <!-- CADASTRO -->
 <div class="wrap" id="setup" hidden>
   <div class="brand"><i></i>Forja</div>
@@ -290,9 +305,15 @@ nav button[aria-current="true"]{color:var(--ember)}
 
   <section data-tab="perfil" hidden>
     <h2>Seu perfil</h2>
+    <div class="card" id="adminCard" hidden></div>
     <div class="card">
       <dl class="dl" id="profileList"></dl>
       <button class="btn" id="editBtn">Editar dados, objetivo e dias</button>
+    </div>
+    <div class="card">
+      <h3>Sua conta</h3>
+      <p class="muted small" id="acctEmail" style="overflow-wrap:anywhere"></p>
+      <button class="btn ghost" id="logoutBtn">Sair da conta</button>
     </div>
     <div class="card">
       <h3>Começar do zero</h3>
@@ -312,9 +333,13 @@ nav button[aria-current="true"]{color:var(--ember)}
   <button data-go="hoje" aria-current="true"><svg viewBox="0 0 24 24"><path d="M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12"/></svg>Hoje</button>
   <button data-go="plano"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg>Plano</button>
   <button data-go="progresso"><svg viewBox="0 0 24 24"><path d="M4 19l5-6 4 3 7-9"/><path d="M15 7h5v5"/></svg>Progresso</button>
-  <button data-go="perfil"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Perfil</button>
+  <button data-go="perfil"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Perfil<i class="badge" id="navBadge" hidden></i></button>
 </nav>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
 <script>
 /* ---------- dados ---------- */
 const DAYN=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
@@ -406,8 +431,9 @@ const G={P:"Proteína",C:"Carboidrato",F:"Fruta",X:"Extra"};
 const BIO={ecto:"Ectomorfo",meso:"Mesomorfo",endo:"Endomorfo",nao:"Não informado"};
 
 /* ---------- estado ---------- */
-const KEY="forja-v1";
-let S={profile:null,weights:[],log:{},ex:{},meals:{}};
+let KEY="forja-v1";
+const blank=()=>({profile:null,weights:[],log:{},ex:{},meals:{}});
+let S=blank();
 const $=s=>document.querySelector(s);
 const iso=d=>{const z=new Date(d);z.setMinutes(z.getMinutes()-z.getTimezoneOffset());return z.toISOString().slice(0,10)};
 const today=iso(new Date()), dow=new Date().getDay();
@@ -526,7 +552,8 @@ function openSetup(edit){
     set("sexo",p.sexo);set("bio",p.bio);set("obj",p.obj);set("local",p.local);if(p.equip)set("equip",p.equip);
     buildDayPick(p.dias);
   } else buildDayPick([1,3,5]);
-  $("#setup").hidden=false; $("#app").hidden=true; $("#nav").hidden=true; document.body.classList.add("setup"); showStep();
+  if(!p) $("#fNome").value=ME?.nome||"";
+  $("#gate").hidden=true; $("#setup").hidden=false; $("#app").hidden=true; $("#nav").hidden=true; document.body.classList.add("setup"); showStep();
 }
 $("#setupForm").addEventListener("change",e=>{if(e.target.name==="local")$("#equipField").hidden=e.target.value==="academia"});
 $("#setupForm").addEventListener("submit",e=>{
@@ -548,7 +575,7 @@ $("#cancelEdit").addEventListener("click",openApp);
 /* ---------- app ---------- */
 let plan=null, chosen=null;
 function openApp(){
-  $("#setup").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; document.body.classList.remove("setup");
+  $("#gate").hidden=true; $("#setup").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; document.body.classList.remove("setup");
   plan=makePlan(S.profile); chosen=null; renderAll(); go("hoje");
 }
 function curWeight(){const ws=[...S.weights].sort((a,b)=>a.d<b.d?-1:1);return ws.length?ws[ws.length-1].kg:S.profile.peso}
@@ -622,6 +649,8 @@ function renderProfile(){
   const rows=[["Nome",esc(p.nome)],["Idade",p.idade+" anos"],["Altura",(p.altura/100).toFixed(2).replace(".",",")+" m"],["Peso atual",kg(curWeight())+" kg"],["Biotipo",BIO[p.bio]],["Objetivo",p.obj==="massa"?"Ganhar massa":"Emagrecer"],
     ["Local",p.local==="academia"?"Academia":(p.equip==="h"?"Casa, com halteres":"Casa, sem equipamento")],["Dias",ORDER.filter(d=>p.dias.includes(d)).map(d=>DAYN[d]).join(", ")]];
   $("#profileList").innerHTML=rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join("");
+  $("#acctEmail").textContent=`Conectado como ${ME?.email||""}${DEMO?" (modo demonstração)":""}`;
+  renderAdmin();
 }
 function renderAll(){renderHeader();renderWeek();renderWorkout();renderMeals();renderPlan();renderProgress();renderProfile()}
 function go(t){document.querySelectorAll("section[data-tab]").forEach(s=>s.hidden=s.dataset.tab!==t);
@@ -630,7 +659,12 @@ function go(t){document.querySelectorAll("section[data-tab]").forEach(s=>s.hidde
 document.addEventListener("click",e=>{
   const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);return}
   const pw=e.target.closest("[data-w]");if(pw){chosen=pw.dataset.w;renderWorkout();return}
-  const del=e.target.closest("[data-del]");if(del){S.weights=S.weights.filter(w=>w.d!==del.dataset.del);save();renderProgress();renderProfile()}
+  const del=e.target.closest("[data-del]");if(del){S.weights=S.weights.filter(w=>w.d!==del.dataset.del);save();renderProgress();renderProfile();return}
+  const ap=e.target.closest("[data-approve]");if(ap){setAccess(ap.dataset.approve,{aprovado:true,recusado:false,liberadoEm:Date.now()});return}
+  const rf=e.target.closest("[data-refuse],[data-revoke]");if(rf){
+    if(rf.dataset.revoke&&rf.dataset.sure!=="1"){rf.dataset.sure="1";rf.textContent="Confirmar";return}
+    setAccess(rf.dataset.refuse||rf.dataset.revoke,{aprovado:false,recusado:true});return}
+  if(e.target.closest("[data-out]")) logout();
 });
 document.addEventListener("change",e=>{
   const t=e.target;
@@ -644,13 +678,225 @@ $("#wForm").addEventListener("submit",e=>{e.preventDefault();const v=parseFloat(
 $("#editBtn").addEventListener("click",()=>openSetup(true));
 $("#resetBtn").addEventListener("click",()=>{$("#resetConfirm").hidden=false;$("#resetBtn").hidden=true});
 $("#resetNo").addEventListener("click",()=>{$("#resetConfirm").hidden=true;$("#resetBtn").hidden=false});
-$("#resetYes").addEventListener("click",()=>{S={profile:null,weights:[],log:{},ex:{},meals:{}};try{localStorage.removeItem(KEY)}catch(e){}
+$("#logoutBtn").addEventListener("click",logout);
+$("#resetYes").addEventListener("click",()=>{S=blank();try{localStorage.removeItem(KEY)}catch(e){}
   $("#resetConfirm").hidden=true;$("#resetBtn").hidden=false;
   document.querySelectorAll("#setupForm input").forEach(i=>{if(i.type==="radio"||i.type==="checkbox")i.checked=false;else i.value=""});openSetup(false)});
 
+/* ---------- acesso: conta + liberação pelo Kaique ---------- */
+const CFG=window.FIREBASE_CONFIG||{};
+const DEMO=!CFG.apiKey||CFG.apiKey==="COLE_AQUI";
+const ADMINS=(window.ADMIN_EMAILS||[]).map(e=>String(e).toLowerCase());
+const WHATS=String(window.WHATSAPP||"").replace(/\D/g,"");
+const isAdminEmail=e=>ADMINS.includes(String(e||"").toLowerCase());
+const isApproved=u=>!!u&&(u.aprovado===true||isAdminEmail(u.email));
+const ERR={
+  "auth/invalid-email":"E-mail inválido. Confira se digitou certinho.",
+  "auth/missing-password":"Digite sua senha.",
+  "auth/user-not-found":"Não achamos uma conta com esse e-mail. Toque em \"Criar conta\".",
+  "auth/wrong-password":"Senha incorreta. Tente de novo ou use \"Esqueci a senha\".",
+  "auth/invalid-credential":"E-mail ou senha incorretos. Tente de novo ou use \"Esqueci a senha\".",
+  "auth/email-already-in-use":"Esse e-mail já tem conta. Toque em \"Entrar\".",
+  "auth/weak-password":"A senha precisa ter pelo menos 6 caracteres.",
+  "auth/too-many-requests":"Muitas tentativas seguidas. Espere alguns minutos e tente de novo.",
+  "auth/network-request-failed":"Sem conexão com a internet. Verifique e tente de novo.",
+  "permission-denied":"Sem permissão para isso. Saia e entre de novo."
+};
+const errMsg=e=>ERR[e?.code]||"Algo deu errado. Tente de novo.";
+
+function firebaseStore(){
+  firebase.initializeApp(CFG);
+  const auth=firebase.auth(), fs=firebase.firestore();
+  fs.enablePersistence().catch(()=>{});
+  const U=fs.collection("users"), doc=d=>d.exists?{id:d.id,...d.data()}:null;
+  return{
+    onAuth:cb=>auth.onAuthStateChanged(u=>cb(u?{uid:u.uid,email:u.email}:null)),
+    signIn:(e,p)=>auth.signInWithEmailAndPassword(e,p),
+    signUp:async(e,p)=>{const c=await auth.createUserWithEmailAndPassword(e,p);return{uid:c.user.uid,email:c.user.email}},
+    reset:e=>auth.sendPasswordResetEmail(e),
+    signOut:()=>auth.signOut(),
+    onMe:(id,cb,er)=>U.doc(id).onSnapshot(d=>cb(doc(d),d.metadata.fromCache),er),
+    onUsers:(cb,er)=>U.onSnapshot(s=>cb(s.docs.map(doc)),er),
+    saveUser:(id,data)=>U.doc(id).set(data,{merge:true})
+  };
+}
+// Sem Firebase configurado: contas ficam só neste aparelho, para testar o fluxo
+function demoStore(){
+  const K="forja-demo"; let db=null;
+  try{db=JSON.parse(localStorage.getItem(K))}catch(e){}
+  db=db&&db.acc?db:{acc:{},users:{},session:null};
+  const subs={auth:[],me:[],users:[]};
+  const persist=()=>{try{localStorage.setItem(K,JSON.stringify(db))}catch(e){}};
+  const sess=()=>db.session&&db.acc[db.session]?{uid:db.session,email:db.acc[db.session]}:null;
+  const one=id=>db.users[id]?{id,...db.users[id]}:null;
+  const emit=()=>{subs.me.forEach(([id,cb])=>cb(one(id),false));subs.users.forEach(cb=>cb(Object.keys(db.users).map(one)))};
+  const login=id=>{db.session=id;persist();subs.auth.forEach(f=>f(sess()))};
+  const off=(arr,x)=>()=>{const i=arr.indexOf(x);if(i>=0)arr.splice(i,1)};
+  return{
+    onAuth:cb=>{subs.auth.push(cb);setTimeout(()=>cb(sess()));return off(subs.auth,cb)},
+    signIn:async(e)=>{const id=Object.keys(db.acc).find(k=>db.acc[k]===e.toLowerCase());if(!id)throw{code:"auth/invalid-credential"};login(id)},
+    signUp:async(e,p)=>{e=e.toLowerCase();
+      if(!/\S+@\S+\.\S+/.test(e))throw{code:"auth/invalid-email"};
+      if(Object.values(db.acc).includes(e))throw{code:"auth/email-already-in-use"};
+      if((p||"").length<6)throw{code:"auth/weak-password"};
+      const id="u"+Date.now();db.acc[id]=e;login(id);return{uid:id,email:e}},
+    reset:async()=>{throw{code:"demo"}},
+    signOut:async()=>{db.session=null;persist();subs.auth.forEach(f=>f(null))},
+    onMe:(id,cb)=>{const x=[id,cb];subs.me.push(x);setTimeout(()=>cb(one(id),false));return off(subs.me,x)},
+    onUsers:cb=>{subs.users.push(cb);setTimeout(()=>cb(Object.keys(db.users).map(one)));return off(subs.users,cb)},
+    saveUser:async(id,data)=>{db.users[id]={...db.users[id],...data};persist();setTimeout(emit)}
+  };
+}
+
+let store=null, ME=null, ADMIN=false, entered=false, watch=[], signingUp=false, clients=[], authTab="in";
+const stopWatch=()=>{watch.forEach(f=>f&&f());watch=[]};
+function gate(html){
+  $("#gate").innerHTML=html; $("#gate").hidden=false;
+  $("#setup").hidden=true; $("#app").hidden=true; $("#nav").hidden=true; document.body.classList.add("setup"); window.scrollTo(0,0);
+}
+const brand=`<div class="brand"><i></i>Forja</div>`;
+const credit=`<p class="credit">Criado por <strong>Kaique Belarmino</strong></p>`;
+const demoNote=DEMO?`<p class="note small"><strong>Modo demonstração.</strong> As contas ficam só neste aparelho até o app ser ligado ao Firebase. Qualquer senha funciona.</p>`:"";
+const newUser=(email,nome,whats)=>({nome:nome.slice(0,40),whats:whats.slice(0,30),email:email.toLowerCase(),createdAt:Date.now(),aprovado:isAdminEmail(email),recusado:false});
+const waLink=w=>{const d=String(w||"").replace(/\D/g,"");return d.length<10?"":"https://wa.me/"+(d.length<=11?"55"+d:d)};
+
+function renderLogin(msg=""){
+  const up=authTab==="up", email=$("#aEmail")?.value||"";
+  gate(`${brand}
+  <h1>${up?"Crie sua conta":"Entre na sua conta"}</h1>
+  <p class="muted">${up?"Depois do cadastro, o Kaique libera seu acesso e o app abre sozinho.":"Treino e alimentação personalizados, em casa ou na academia."}</p>
+  ${demoNote}
+  <div class="seg" role="tablist"><button type="button" role="tab" aria-selected="${!up}" data-auth="in">Entrar</button><button type="button" role="tab" aria-selected="${up}" data-auth="up">Criar conta</button></div>
+  <form id="authForm" novalidate style="display:flex;flex-direction:column;gap:14px">
+    ${up?`<label class="field"><span>Seu nome</span><input type="text" id="aNome" autocomplete="name" maxlength="40" placeholder="Nome e sobrenome"></label>
+    <label class="field"><span>WhatsApp</span><input type="tel" id="aWhats" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="(11) 99999-9999"></label>`:""}
+    <label class="field"><span>E-mail</span><input type="email" id="aEmail" autocomplete="email" inputmode="email" value="${esc(email)}"></label>
+    <label class="field"><span>Senha</span><input type="password" id="aPass" autocomplete="${up?"new-password":"current-password"}" placeholder="${up?"Mínimo 6 caracteres":""}"></label>
+    <p class="err" id="aErr" role="alert">${esc(msg)}</p>
+    <button class="btn" id="aGo">${up?"Criar conta":"Entrar"}</button>
+    ${up?"":`<button type="button" class="link" id="aReset">Esqueci a senha</button>`}
+  </form>
+  ${credit}`);
+  document.querySelectorAll("[data-auth]").forEach(b=>b.onclick=()=>{authTab=b.dataset.auth;renderLogin()});
+  $("#aReset")?.addEventListener("click",async()=>{
+    const e=$("#aEmail").value.trim();
+    if(!e){$("#aErr").textContent="Digite seu e-mail acima e toque em \"Esqueci a senha\" de novo.";return}
+    if(DEMO){$("#aErr").textContent="No modo demonstração não tem senha para recuperar.";return}
+    try{await store.reset(e);$("#aErr").textContent="";$("#aErr").insertAdjacentHTML("afterend",`<p class="note small">Enviamos um link de nova senha para ${esc(e)}. Veja também a caixa de spam.</p>`)}
+    catch(er){$("#aErr").textContent=errMsg(er)}
+  });
+  $("#authForm").onsubmit=async ev=>{
+    ev.preventDefault();
+    const e=$("#aEmail").value.trim(), p=$("#aPass").value, b=$("#aGo"), label=b.textContent;
+    const fail=m=>{$("#aErr").textContent=m;b.disabled=false;b.textContent=label};
+    if(!e) return fail("Digite seu e-mail.");
+    if(!p) return fail("Digite sua senha.");
+    let nome="", whats="";
+    if(authTab==="up"){
+      nome=$("#aNome").value.trim(); whats=$("#aWhats").value.trim();
+      if(!nome) return fail("Digite seu nome.");
+      if(whats.replace(/\D/g,"").length<10) return fail("Digite seu WhatsApp com DDD.");
+    }
+    b.disabled=true; b.textContent="Aguarde…";
+    try{
+      if(authTab==="up"){
+        signingUp=true;
+        const u=await store.signUp(e,p);
+        await store.saveUser(u.uid,newUser(u.email||e,nome,whats));
+        signingUp=false;
+      } else await store.signIn(e,p);
+    }catch(er){
+      if(signingUp&&ME){signingUp=false;renderRequest(errMsg(er));return}
+      signingUp=false; fail(errMsg(er));
+    }
+  };
+}
+// Conta existe mas o pedido de acesso não foi salvo (ex.: caiu a internet no cadastro)
+function renderRequest(msg=""){
+  gate(`${brand}
+  <h1>Falta pouco</h1>
+  <p class="muted">Confirme seus dados para pedir acesso ao Forja.</p>
+  <form id="reqForm" novalidate style="display:flex;flex-direction:column;gap:14px">
+    <label class="field"><span>Seu nome</span><input type="text" id="rNome" autocomplete="name" maxlength="40"></label>
+    <label class="field"><span>WhatsApp</span><input type="tel" id="rWhats" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="(11) 99999-9999"></label>
+    <p class="err" id="rErr" role="alert">${esc(msg)}</p>
+    <button class="btn" id="rGo">Pedir acesso</button>
+    <button type="button" class="link" data-out>Sair da conta</button>
+  </form>`);
+  $("#reqForm").onsubmit=async ev=>{
+    ev.preventDefault();
+    const nome=$("#rNome").value.trim(), whats=$("#rWhats").value.trim();
+    if(!nome){$("#rErr").textContent="Digite seu nome.";return}
+    if(whats.replace(/\D/g,"").length<10){$("#rErr").textContent="Digite seu WhatsApp com DDD.";return}
+    $("#rGo").disabled=true;
+    try{await store.saveUser(ME.uid,newUser(ME.email,nome,whats))}catch(er){$("#rGo").disabled=false;$("#rErr").textContent=errMsg(er)}
+  };
+}
+function renderPending(me){
+  const msg=encodeURIComponent(`Oi Kaique! Criei minha conta no Forja com o e-mail ${me.email||ME.email} e quero liberar meu acesso.`);
+  gate(`${brand}
+  <h1>${me.recusado?"Acesso não liberado":"Aguardando liberação"}</h1>
+  <p class="muted">${me.recusado?"Seu acesso ao Forja não está liberado no momento. Se você já fez o pagamento ou acha que é um engano, fale com o Kaique.":"Sua conta foi criada. Assim que o Kaique liberar seu acesso, o app abre sozinho aqui. Pode deixar esta tela aberta."}</p>
+  <div class="card"><dl class="dl"><dt>Nome</dt><dd>${esc(me.nome||"")}</dd><dt>E-mail</dt><dd>${esc(me.email||ME.email||"")}</dd></dl></div>
+  ${WHATS?`<a class="btn" href="https://wa.me/${WHATS}?text=${msg}" target="_blank" rel="noopener">Falar com o Kaique no WhatsApp</a>`:""}
+  <button class="btn ghost" data-out>Sair da conta</button>
+  ${credit}`);
+}
+function enter(me){
+  ME.nome=me.nome||"";
+  if(entered) return;
+  entered=true;
+  KEY="forja-v1:"+ME.uid; S=blank();
+  // dados salvos antes do login (versão sem conta) passam para a primeira conta que entrar neste aparelho
+  try{const old=localStorage.getItem("forja-v1");if(old&&!localStorage.getItem(KEY)){localStorage.setItem(KEY,old);localStorage.removeItem("forja-v1")}}catch(e){}
+  load();
+  if(ADMIN) watch.push(store.onUsers(us=>{clients=us.filter(Boolean);renderAdmin()},()=>{}));
+  if(S.profile) openApp(); else openSetup(false);
+}
+async function logout(){stopWatch();try{await store.signOut()}catch(e){}location.reload()}
+async function setAccess(id,data){
+  try{await store.saveUser(id,data)}catch(e){alert(errMsg(e))}
+}
+function renderAdmin(){
+  const c=$("#adminCard"), nb=$("#navBadge");
+  if(!ADMIN){c.hidden=true;nb.hidden=true;return}
+  const by=(a,b)=>(b.createdAt||0)-(a.createdAt||0);
+  const others=clients.filter(u=>!isAdminEmail(u.email));
+  const pend=others.filter(u=>!u.aprovado&&!u.recusado).sort(by), ok=others.filter(u=>u.aprovado).sort(by), off=others.filter(u=>!u.aprovado&&u.recusado).sort(by);
+  const when=t=>t?fmt(iso(new Date(t))):"";
+  const row=(u,btns)=>{const wa=waLink(u.whats);
+    return `<li class="member"><span class="name">${esc(u.nome||"Sem nome")}<span class="tip">${esc(u.email||"")}${u.whats?` · ${wa?`<a href="${wa}" target="_blank" rel="noopener">${esc(u.whats)}</a>`:esc(u.whats)}`:""}${u.createdAt?` · ${when(u.createdAt)}`:""}</span></span><span class="acts">${btns}</span></li>`};
+  const list=(arr,btn)=>`<ul class="plain">${arr.map(u=>row(u,btn(esc(u.id)))).join("")}</ul>`;
+  c.hidden=false;
+  c.innerHTML=`<div class="head"><h3>Clientes</h3><span class="eyebrow num">${ok.length} com acesso</span></div>
+    ${pend.length?`<p class="eyebrow">Pedindo acesso · ${pend.length}</p>${list(pend,id=>`<button class="mini ghost" data-refuse="${id}">Recusar</button><button class="mini" data-approve="${id}">Liberar</button>`)}`
+      :`<p class="muted small">Nenhum pedido novo. Quando alguém criar conta, aparece aqui para você liberar.</p>`}
+    ${ok.length?`<details><summary>Com acesso · ${ok.length}</summary>${list(ok,id=>`<button class="mini ghost" data-revoke="${id}">Tirar acesso</button>`)}</details>`:""}
+    ${off.length?`<details><summary>Sem acesso · ${off.length}</summary>${list(off,id=>`<button class="mini" data-approve="${id}">Liberar</button>`)}</details>`:""}`;
+  nb.hidden=!pend.length; nb.textContent=pend.length;
+}
+function boot(){
+  if(!DEMO&&typeof firebase==="undefined"){
+    gate(`${brand}<h1>Sem conexão</h1><p class="muted">Precisamos da internet para abrir o Forja pela primeira vez. Verifique a conexão e tente de novo.</p><button class="btn" onclick="location.reload()">Tentar de novo</button>`);
+    return;
+  }
+  store=DEMO?demoStore():firebaseStore();
+  store.onAuth(u=>{
+    stopWatch(); entered=false; clients=[]; ME=u;
+    if(!u){ADMIN=false;return renderLogin()}
+    ADMIN=isAdminEmail(u.email);
+    gate(`${brand}<h1>Carregando…</h1><button class="link" data-out style="align-self:flex-start">Sair da conta</button>`);
+    watch.push(store.onMe(u.uid,(me,cached)=>{
+      if(!me){if(!signingUp&&!cached)renderRequest();return}
+      if(isApproved(me)) enter(me);
+      else if(entered) location.reload(); // acesso tirado com o app aberto
+      else renderPending(me);
+    },er=>renderLogin(errMsg(er))));
+  });
+}
+
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
-load();
-if(S.profile) openApp(); else openSetup(false);
+boot();
 </script>
 
 </body>
