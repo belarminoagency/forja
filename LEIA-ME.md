@@ -20,7 +20,7 @@ Sem o passo 1, o app abre em **modo demonstração** (contas só no aparelho, pa
 9. Envie os arquivos para o GitHub.
 
 ## 2. Crie a sua conta primeiro
-Abra o app → **Criar conta** com `agencia.mkt.belarmino@gmail.com`. Esse e-mail entra direto, sem aprovação, e é o único que vê o painel **Clientes**.
+Abra o app → **Criar conta** com `belarminokaique581@gmail.com`. Esse e-mail entra direto, sem aprovação, e é o único que vê o painel **Clientes**.
 Faça isso logo depois de ligar o Firebase, antes de divulgar o link.
 
 Para ter outro admin: adicione o e-mail em `ADMIN_EMAILS` (config.js) **e** na lista de `firestore.rules` (e publique as regras de novo).

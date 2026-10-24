@@ -5,7 +5,7 @@ service cloud.firestore {
     // Quem libera o acesso. Mesmo e-mail de ADMIN_EMAILS no config.js.
     function admin() {
       return request.auth != null && request.auth.token.email in [
-        'agencia.mkt.belarmino@gmail.com'
+        'belarminokaique581@gmail.com'
       ];
     }
     function dono(uid) {
